@@ -115,6 +115,13 @@ function normalizeResponse(parsed: any): NormalizedAgentResponse {
 }
 
 /**
+ * GET /api/agent — health check
+ */
+export async function GET() {
+  return NextResponse.json({ status: 'ok', timestamp: new Date().toISOString() })
+}
+
+/**
  * POST /api/agent
  *
  * Two modes, both POST:
@@ -132,7 +139,7 @@ export async function POST(request: NextRequest) {
           response: { status: 'error', result: {}, message: 'LYZR_API_KEY not configured' },
           error: 'LYZR_API_KEY not configured on server',
         },
-        { status: 500 }
+        { status: 200 }
       )
     }
 
@@ -151,7 +158,7 @@ export async function POST(request: NextRequest) {
         response: { status: 'error', result: {}, message: errorMsg },
         error: errorMsg,
       },
-      { status: 500 }
+      { status: 200 }
     )
   }
 }
@@ -208,6 +215,7 @@ async function submitTask(body: any) {
         errorMsg = errorData?.error || errorData?.message || errorMsg
       } catch {}
     }
+    // Return 200 with success:false to avoid fetchWrapper triggering iframe 500 error
     return NextResponse.json(
       {
         success: false,
@@ -215,7 +223,7 @@ async function submitTask(body: any) {
         error: errorMsg,
         raw_response: submitText,
       },
-      { status: submitRes.status }
+      { status: submitRes.status >= 500 ? 200 : submitRes.status }
     )
   }
 
@@ -249,10 +257,11 @@ async function pollTask(task_id: string) {
       {
         success: false,
         status: 'failed',
+        response: { status: 'error', result: {}, message: msg },
         error: msg,
         raw_response: pollText,
       },
-      { status: pollRes.status }
+      { status: 200 }
     )
   }
 
@@ -263,16 +272,20 @@ async function pollTask(task_id: string) {
     return NextResponse.json({ status: 'processing' })
   }
 
-  // Task failed
+  // Task failed — return 200 with success:false so fetchWrapper doesn't trigger 500 error
   if (task.status === 'failed') {
+    const failError = task.error || 'Agent task failed'
+    // Check if it's a tool auth issue
+    const isToolAuth = typeof failError === 'string' && failError.includes('tool_auth')
     return NextResponse.json(
       {
         success: false,
         status: 'failed',
-        response: { status: 'error', result: {}, message: task.error || 'Agent task failed' },
-        error: task.error || 'Agent task failed',
+        response: { status: 'error', result: {}, message: failError },
+        error: failError,
+        ...(isToolAuth ? { tool_auth: true } : {}),
       },
-      { status: 500 }
+      { status: 200 }
     )
   }
 

@@ -573,49 +573,96 @@ export default function Page() {
       })
 
       if (result.success) {
+        // Multi-layer parsing: try result.response.result first, then raw_response, then response itself
         const rawResult = result?.response?.result || {}
         let parsed: Record<string, unknown> | null = null
 
+        // Attempt 1: Parse via parseLLMJson from result
         try {
-          parsed = parseLLMJson(rawResult)
+          const p = parseLLMJson(rawResult)
+          if (p && typeof p === 'object' && !Array.isArray(p)) {
+            parsed = p as Record<string, unknown>
+          }
         } catch {
-          parsed = null
+          // Continue to fallback
         }
 
+        // Attempt 2: If parsed is empty or missing key fields, try raw_response
+        if (!parsed || (!parsed.action && !parsed.message && !parsed.meetings)) {
+          try {
+            const rawStr = result?.raw_response
+            if (rawStr && typeof rawStr === 'string') {
+              const p2 = parseLLMJson(rawStr)
+              if (p2 && typeof p2 === 'object' && !Array.isArray(p2)) {
+                // Check if this has more useful data
+                const p2Obj = p2 as Record<string, unknown>
+                if (p2Obj.action || p2Obj.message || p2Obj.meetings) {
+                  parsed = p2Obj
+                }
+              }
+            }
+          } catch {
+            // Continue
+          }
+        }
+
+        // Attempt 3: Use rawResult directly if it has the right shape
         if (!parsed || typeof parsed !== 'object') {
           parsed = rawResult as Record<string, unknown>
         }
 
+        // Extract fields with robust fallbacks
         const action = (parsed?.action as string) || 'general'
-        const agentMessage = (parsed?.message as string) || result?.response?.message || 'Response received.'
+
+        // Message extraction: try multiple paths
+        let agentMessage = ''
+        if (typeof parsed?.message === 'string' && parsed.message) {
+          agentMessage = parsed.message
+        } else if (typeof result?.response?.message === 'string' && result.response.message) {
+          agentMessage = result.response.message
+        } else if (typeof (rawResult as Record<string, unknown>)?.text === 'string') {
+          agentMessage = (rawResult as Record<string, unknown>).text as string
+        } else if (typeof (rawResult as Record<string, unknown>)?.response === 'string') {
+          agentMessage = (rawResult as Record<string, unknown>).response as string
+        } else if (typeof rawResult === 'string') {
+          agentMessage = rawResult
+        } else {
+          agentMessage = 'Response received.'
+        }
+
+        // Parse meetings with safety
         const rawMeetings = parsed?.meetings
         const meetings: Meeting[] = Array.isArray(rawMeetings)
           ? rawMeetings.map((m: Record<string, unknown>) => ({
-              title: (m?.title as string) ?? '',
-              start: (m?.start as string) ?? '',
-              end: (m?.end as string) ?? '',
-              attendees: Array.isArray(m?.attendees) ? (m.attendees as string[]) : [],
-              location: (m?.location as string) ?? '',
-              meetLink: (m?.meetLink as string) ?? '',
+              title: String(m?.title ?? ''),
+              start: String(m?.start ?? ''),
+              end: String(m?.end ?? ''),
+              attendees: Array.isArray(m?.attendees) ? (m.attendees as string[]).map(String) : [],
+              location: String(m?.location ?? ''),
+              meetLink: String(m?.meetLink ?? m?.meet_link ?? ''),
             }))
           : []
-        const rawSlots = parsed?.freeSlots
+
+        // Parse free slots with safety
+        const rawSlots = parsed?.freeSlots ?? parsed?.free_slots
         const freeSlots: FreeSlot[] = Array.isArray(rawSlots)
           ? rawSlots.map((s: Record<string, unknown>) => ({
-              start: (s?.start as string) ?? '',
-              end: (s?.end as string) ?? '',
-              duration: (s?.duration as string) ?? '',
+              start: String(s?.start ?? ''),
+              end: String(s?.end ?? ''),
+              duration: String(s?.duration ?? ''),
             }))
           : []
-        const rawEvent = parsed?.createdEvent as Record<string, unknown> | null
+
+        // Parse created event with safety
+        const rawEvent = (parsed?.createdEvent ?? parsed?.created_event) as Record<string, unknown> | null
         const createdEvent: CreatedEvent | null =
-          rawEvent && (rawEvent?.title as string)
+          rawEvent && String(rawEvent?.title ?? '')
             ? {
-                title: (rawEvent.title as string) ?? '',
-                start: (rawEvent.start as string) ?? '',
-                end: (rawEvent.end as string) ?? '',
-                attendees: Array.isArray(rawEvent?.attendees) ? (rawEvent.attendees as string[]) : [],
-                meetLink: (rawEvent.meetLink as string) ?? '',
+                title: String(rawEvent.title ?? ''),
+                start: String(rawEvent.start ?? ''),
+                end: String(rawEvent.end ?? ''),
+                attendees: Array.isArray(rawEvent?.attendees) ? (rawEvent.attendees as string[]).map(String) : [],
+                meetLink: String(rawEvent.meetLink ?? rawEvent.meet_link ?? ''),
               }
             : null
 
@@ -632,12 +679,12 @@ export default function Page() {
 
         setMessages(prev => [...prev, assistantMsg])
       } else {
+        // Handle error response gracefully -- show in chat, not as a blocking error
         const errText = result?.error || result?.response?.message || 'An error occurred. Please try again.'
-        setErrorMsg(errText)
         const errorAssistantMsg: ChatMessage = {
           id: generateUUID(),
           role: 'assistant',
-          content: `I encountered an issue: ${errText}`,
+          content: `I encountered an issue processing your request. ${typeof errText === 'string' ? errText : 'Please try again.'}`,
           timestamp: new Date(),
           action: 'general',
         }
@@ -645,11 +692,10 @@ export default function Page() {
       }
     } catch (err) {
       const errText = err instanceof Error ? err.message : 'Network error'
-      setErrorMsg(errText)
       const errorAssistantMsg: ChatMessage = {
         id: generateUUID(),
         role: 'assistant',
-        content: `Something went wrong: ${errText}`,
+        content: `Something went wrong while processing your request. Please try again. (${errText})`,
         timestamp: new Date(),
         action: 'general',
       }
