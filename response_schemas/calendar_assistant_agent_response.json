@@ -1,0 +1,72 @@
+{
+  "agent_name": "Calendar Assistant Agent",
+  "agent_id": "69a01a5a95ad8ebce61fe0a4",
+  "description": "Manages all calendar interactions \u2014 fetches meeting details, identifies free slots based on user's working hours and duration preferences, and creates new calendar events with attendees and Google Meet links.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "action": "string",
+    "message": "string",
+    "meetings": [
+      {
+        "title": "string",
+        "start": "string",
+        "end": "string",
+        "attendees": [
+          "string"
+        ],
+        "location": "string",
+        "meetLink": "string"
+      }
+    ],
+    "freeSlots": [
+      {
+        "start": "string",
+        "end": "string",
+        "duration": "string"
+      }
+    ],
+    "createdEvent": {
+      "title": "string",
+      "start": "string",
+      "end": "string",
+      "attendees": [
+        "string"
+      ],
+      "meetLink": "string"
+    }
+  },
+  "example_response": {
+    "action": "The action performed: fetch_meetings, find_slots, create_meeting, general",
+    "message": "A conversational response message",
+    "meetings": [
+      {
+        "title": "sample string",
+        "start": "sample string",
+        "end": "sample string",
+        "attendees": [
+          "sample string"
+        ],
+        "location": "sample string",
+        "meetLink": "sample string"
+      }
+    ],
+    "freeSlots": [
+      {
+        "start": "sample string",
+        "end": "sample string",
+        "duration": "sample string"
+      }
+    ],
+    "createdEvent": {
+      "title": "sample string",
+      "start": "sample string",
+      "end": "sample string",
+      "attendees": [
+        "sample string"
+      ],
+      "meetLink": "sample string"
+    }
+  }
+}

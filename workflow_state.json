@@ -1,0 +1,15 @@
+{
+  "agents": {
+    "calendar_assistant_agent": {
+      "agent_id": "69a01a5a95ad8ebce61fe0a4",
+      "name": "Calendar Assistant Agent",
+      "type": "single",
+      "tools": [
+        "GOOGLECALENDAR_LIST_CALENDARS",
+        "GOOGLECALENDAR_FIND_EVENT",
+        "GOOGLECALENDAR_FIND_FREE_SLOTS",
+        "GOOGLECALENDAR_CREATE_EVENT"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "User Query",
+      "nodeCategory": "input"
+    },
+    {
+      "id": "calendar_assistant_agent",
+      "type": "Agent",
+      "label": "Calendar Assistant Agent",
+      "nodeCategory": "agent"
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Calendar Response",
+      "nodeCategory": "end"
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_node",
+      "target": "calendar_assistant_agent"
+    },
+    {
+      "source": "calendar_assistant_agent",
+      "target": "output_node"
+    }
+  ]
+}
